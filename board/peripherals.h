@@ -29,8 +29,6 @@ extern "C" {
 #define I2C0_CLOCK_SOURCE I2C0_CLK_SRC
 /* Definition of the clock source frequency */
 #define I2C0_CLK_FREQ 16000000UL
-/* Transfer buffer size. */
-#define I2C0_BUFFER_SIZE 10
 /* Definition of peripheral ID */
 #define UART0_PERIPHERAL UART0
 /* Definition of the clock source frequency */
@@ -40,9 +38,6 @@ extern "C" {
  * Global variables
  **********************************************************************************************************************/
 extern const i2c_master_config_t I2C0_config;
-extern i2c_master_handle_t I2C0_handle;
-extern uint8_t I2C0_buffer[I2C0_BUFFER_SIZE];
-extern i2c_master_transfer_t I2C0_transfer;
 extern const uart_config_t UART0_config;
 
 /***********************************************************************************************************************

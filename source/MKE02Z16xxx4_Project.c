@@ -33,15 +33,51 @@
  * @brief   Application entry point.
  */
 #include <stdio.h>
+#include <string.h>
 #include "board.h"
 #include "peripherals.h"
 #include "pin_mux.h"
 #include "clock_config.h"
 #include "MKE02Z4.h"
 
-const uint8_t SM_UART_04L_Header[] = {0x42, 0x4D};
+
+#define I2C_MASTER_SLAVE_ADDR_7BIT 0x70
+#define I2C_DATA_LENGTH 6
+#define CRC_POLYNOMIAL 0x131 //P(x) = x^8 + x^5 + x^4 + 1 = 100110001
+
+
+
+uint8_t read_Buffer[I2C_DATA_LENGTH];	//A buffer stores I2C data received
+
+enum SHTC3_COMMAND{
+	SOFTWARE_RESET = 0x805D,
+	READ_ID_REGISTER = 0xEFC8,
+	WAKEUP = 0x3517,
+	SLEEP = 0xB098,
+	//stretching enabled
+	normalMode_stretchingEnabled_T_FIRST = 0x7CA2,
+	normalMode_stretchingEnabled_RH_FIRST = 0x5C24,
+	lowPowMode_stretchingEnabled_T_FIRST = 0x6458,
+	lowPowMode_stretchingEnabled_RH_FIRST = 0x44DE,
+	//stretching disabled
+	normalMode_stretchingDisabled_T_FIRST = 0x7866,
+	normalMode_stretchingDisabled_RH_FIRST = 0x58E0,
+	lowPowMode_stretchingDisabled_T_FIRST = 0x609C,
+	lowPowMode_stretchingDisabled_RH_FIRST = 0x401A
+};
+
+struct SHTC3{
+	float humidity;
+	float temperature;
+};
+
+static struct SHTC3 SHTC3_Data;
+
+const uint8_t SM_UART_04L_Header[] = {0x42, 0x4D}; //Start each data frame with this 2 byte
+
 //A 32 byte buffer to store Sensor data, ch to store header for comparision
-static volatile uint8_t SM_UART_04L_Data[32], ch;
+static uint8_t SM_UART_04L_Data[32], ch;
+
 struct SM_UART_04L_Data{
 	uint16_t framelen;
 	uint16_t pm10_standard, pm25_standard, pm100_standard;
@@ -51,10 +87,123 @@ struct SM_UART_04L_Data{
 	uint16_t checksum;
 };
 
-static volatile struct SM_UART_04L_Data PM_Data;
+static struct SM_UART_04L_Data PM_Data;
+
+
 
 /*
+ * @brief Configure I2C Master to send command to slave
  *
+ *
+ * */
+void SHTC3_sendCommand(enum SHTC3_COMMAND command){
+	i2c_master_transfer_t Transfer_config;
+	memset(&Transfer_config, 0, sizeof(Transfer_config));
+	Transfer_config.slaveAddress   = I2C_MASTER_SLAVE_ADDR_7BIT;
+	Transfer_config.direction      = kI2C_Write;
+	Transfer_config.subaddress     = (uint32_t)command;
+	Transfer_config.subaddressSize = 1;
+	Transfer_config.data           = NULL;
+	Transfer_config.dataSize       = 0;
+	Transfer_config.flags          = kI2C_TransferDefaultFlag;
+	I2C_MasterTransferBlocking(I2C0, &Transfer_config);
+}
+
+/*
+ * @brief Do nothing command
+ *
+ * */
+void I2C_Wait(uint32_t i){
+	while(i--){
+		__NOP();
+	}
+}
+
+
+/*
+ *	@brief Configure I2C Master to receive data from slave, return value to read_Buffer[I2C_DATA_LENGTH]
+ *
+ *
+ * */
+void SHTC3_readData(){
+	i2c_master_transfer_t Receiver_config;
+	memset(&Receiver_config, 0, sizeof(Receiver_config));
+	Receiver_config.slaveAddress   = I2C_MASTER_SLAVE_ADDR_7BIT;
+	Receiver_config.direction      = kI2C_Read;
+	Receiver_config.subaddress     = (uint32_t)NULL;
+	Receiver_config.subaddressSize = 0;
+	Receiver_config.data           = read_Buffer;
+	Receiver_config.dataSize       = I2C_DATA_LENGTH;
+	Receiver_config.flags          = kI2C_TransferDefaultFlag;
+	I2C_MasterTransferBlocking(I2C0, &Receiver_config);
+}
+
+/*
+ * @brief 4 Steps for a single read of SHTC3 Sensor
+ * 	1 Wakeup Command
+ * 	2 Measurement command
+ * 	3 Read out command
+ * 	4 Sleep command
+ *
+ * */
+void SHTC3_singleRead(){
+	SHTC3_sendCommand(WAKEUP);
+	I2C_Wait(1000);
+	SHTC3_sendCommand(normalMode_stretchingEnabled_RH_FIRST);
+	I2C_Wait(1000);
+	SHTC3_readData();
+	I2C_Wait(2000);
+	SHTC3_sendCommand(SLEEP);
+}
+
+/*
+ * @brief Test checksum byte returned in data frame
+ *
+ *
+ * */
+uint8_t SHTC3_testChecksum(uint8_t *data_frame){
+	uint8_t bit;
+	uint8_t crc = 0xFF; // calculated checksum
+	uint8_t byteCtr;    // byte counter
+
+	// calculates 8-Bit checksum with given polynomial
+	for(byteCtr = 0; byteCtr < 2; byteCtr++) {
+		crc ^= (data_frame[byteCtr]);
+		for(bit = 8; bit > 0; --bit) {
+		  if(crc & 0x80) {
+			crc = (crc << 1) ^ CRC_POLYNOMIAL;
+		  } else {
+			crc = (crc << 1);
+		  }
+		}
+	}
+
+	if(crc != data_frame[2]) return 0;
+	else return 1;
+}
+
+/*
+ * @brief Calculate the Humidity value
+ *
+ *
+ * */
+void SHTC3_humidCal(uint8_t *data_frame, struct SHTC3 *SHTC3_Data){
+	// RH = rawValue / 2^16 * 100
+	SHTC3_Data->humidity = 100 * (float)(data_frame[0] * 256 + data_frame[1]) / 65536.0f;
+}
+
+/*
+ * @brief Calculate the temperature value
+ *
+ *
+ * */
+void SHTC3_tempCal(uint8_t *data_frame, struct SHTC3 *SHTC3_Data){
+	// T = -45 + 175 * rawValue / 2^16
+	SHTC3_Data->temperature = 175 * (float)(data_frame[3] * 256 + data_frame[4]) / 65536.0f - 45.0f;
+}
+
+/*
+ * @brief get Sensor data
  *
  *
  * */
@@ -71,7 +220,7 @@ void SM_UART_04L_getData(uint8_t *SM_UART_04L_Data, uint8_t ch){
 }
 
 /*
- *
+ * @brief test checksum byte
  *
  *
  * */
@@ -88,11 +237,11 @@ uint8_t SM_UART_04L_testCheckSum(uint8_t *SM_UART_04L_Data, struct SM_UART_04L_D
 }
 
 /*
- *
+ * @brief calculate value from data frame
  *
  *
  * */
-void SM_UART_04L_dataParse(uint8_t *SM_UART_04L_Data, struct SM_UART_04L_Data *PM_Data){
+void SM_UART_04L_dataCal(uint8_t *SM_UART_04L_Data, struct SM_UART_04L_Data *PM_Data){
 	PM_Data->pm10_standard = SM_UART_04L_Data[4]*256 + SM_UART_04L_Data[5];
 	PM_Data->pm25_standard = SM_UART_04L_Data[6]*256 + SM_UART_04L_Data[7];
 	PM_Data->pm100_standard = SM_UART_04L_Data[8]*256 + SM_UART_04L_Data[9];
@@ -113,10 +262,22 @@ int main(void) {
 
 
     while(1) {
+
+    	//SM_UART_04L
     	SM_UART_04L_getData(SM_UART_04L_Data, ch);
     	if(SM_UART_04L_testCheckSum(SM_UART_04L_Data, &PM_Data) == 1){
-    		SM_UART_04L_dataParse(SM_UART_04L_Data, &PM_Data);
+    		SM_UART_04L_dataCal(SM_UART_04L_Data, &PM_Data);
     	}
+
+    	//SHTC3
+    	SHTC3_singleRead();
+    	if(SHTC3_testChecksum(read_Buffer) == 1){
+    		SHTC3_humidCal(read_Buffer, &SHTC3_Data);
+    	}
+    	if(SHTC3_testChecksum(read_Buffer) == 1){
+    		SHTC3_tempCal(read_Buffer, &SHTC3_Data);
+    	}
+
     }
     return 0 ;
 }

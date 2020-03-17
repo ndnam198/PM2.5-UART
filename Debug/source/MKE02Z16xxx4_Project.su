@@ -1,4 +1,11 @@
-MKE02Z16xxx4_Project.c:59:6:SM_UART_04L_getData	16	static
-MKE02Z16xxx4_Project.c:76:9:SM_UART_04L_testCheckSum	24	static
-MKE02Z16xxx4_Project.c:93:6:SM_UART_04L_dataParse	16	static
-MKE02Z16xxx4_Project.c:105:5:main	8	static
+MKE02Z16xxx4_Project.c:99:6:SHTC3_sendCommand	48	static
+MKE02Z16xxx4_Project.c:116:6:I2C_Wait	16	static
+MKE02Z16xxx4_Project.c:128:6:SHTC3_readData	32	static
+MKE02Z16xxx4_Project.c:149:6:SHTC3_singleRead	8	static
+MKE02Z16xxx4_Project.c:164:9:SHTC3_testChecksum	24	static
+MKE02Z16xxx4_Project.c:190:6:SHTC3_humidCal	16	static
+MKE02Z16xxx4_Project.c:200:6:SHTC3_tempCal	16	static
+MKE02Z16xxx4_Project.c:210:6:SM_UART_04L_getData	16	static
+MKE02Z16xxx4_Project.c:227:9:SM_UART_04L_testCheckSum	24	static
+MKE02Z16xxx4_Project.c:244:6:SM_UART_04L_dataCal	16	static
+MKE02Z16xxx4_Project.c:256:5:main	8	static

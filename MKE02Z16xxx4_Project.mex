@@ -170,23 +170,7 @@
                   </dependency>
                </dependencies>
                <instances>
-                  <instance name="I2C0" uuid="04b94273-b707-4edd-8218-155651bbf7e6" type="i2c" type_id="i2c_2566d7363e7e9aaedabb432110e372d7" mode="I2C_Transfer" peripheral="I2C0" enabled="true" comment="" custom_name_enabled="false">
-                     <config_set name="transferCfg">
-                        <struct name="transfer">
-                           <setting name="init_transfer" value="true"/>
-                           <struct name="master_transfer_cfg">
-                              <setting name="flags" value="kI2C_TransferDefaultFlag"/>
-                              <setting name="slaveAddress" value="0x70"/>
-                              <setting name="direction" value="kI2C_Write"/>
-                              <setting name="subaddress" value="0"/>
-                              <setting name="subaddressSize" value="2"/>
-                              <setting name="dataSize" value="10"/>
-                           </struct>
-                           <setting name="init_callback" value="false"/>
-                           <setting name="callback_fcn" value=""/>
-                           <setting name="user_data" value=""/>
-                        </struct>
-                     </config_set>
+                  <instance name="I2C0" uuid="04b94273-b707-4edd-8218-155651bbf7e6" type="i2c" type_id="i2c_2566d7363e7e9aaedabb432110e372d7" mode="I2C_Polling" peripheral="I2C0" enabled="true" comment="" custom_name_enabled="false">
                      <config_set name="fsl_i2c" quick_selection="QS_I2C_1">
                         <setting name="i2c_mode" value="kI2C_Master"/>
                         <setting name="clockSource" value="BusInterfaceClock"/>

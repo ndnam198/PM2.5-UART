@@ -49,25 +49,12 @@ component:
 instance:
 - name: 'I2C0'
 - type: 'i2c'
-- mode: 'I2C_Transfer'
+- mode: 'I2C_Polling'
 - custom_name_enabled: 'false'
 - type_id: 'i2c_2566d7363e7e9aaedabb432110e372d7'
 - functional_group: 'BOARD_InitPeripherals'
 - peripheral: 'I2C0'
 - config_sets:
-  - transferCfg:
-    - transfer:
-      - init_transfer: 'true'
-      - master_transfer_cfg:
-        - flags: 'kI2C_TransferDefaultFlag'
-        - slaveAddress: '0x70'
-        - direction: 'kI2C_Write'
-        - subaddress: '0'
-        - subaddressSize: '2'
-        - dataSize: '10'
-      - init_callback: 'false'
-      - callback_fcn: ''
-      - user_data: ''
   - fsl_i2c:
     - i2c_mode: 'kI2C_Master'
     - clockSource: 'BusInterfaceClock'
@@ -86,21 +73,10 @@ const i2c_master_config_t I2C0_config = {
   .baudRate_Bps = 100000,
   .glitchFilterWidth = 0
 };
-i2c_master_handle_t I2C0_handle;
-uint8_t I2C0_buffer[I2C0_BUFFER_SIZE];
-i2c_master_transfer_t I2C0_transfer;
 
 void I2C0_init(void) {
   /* Initialization function */
   I2C_MasterInit(I2C0_PERIPHERAL, &I2C0_config, I2C0_CLK_FREQ);
-  I2C0_transfer.slaveAddress = 0x70;
-  I2C0_transfer.direction = kI2C_Write;
-  I2C0_transfer.subaddress = (uint32_t)NULL;
-  I2C0_transfer.subaddressSize = 2;
-  I2C0_transfer.data = I2C0_buffer;
-  I2C0_transfer.dataSize = I2C0_BUFFER_SIZE;
-  I2C0_transfer.flags = kI2C_TransferDefaultFlag;
-  I2C_MasterTransferCreateHandle(I2C0_PERIPHERAL, &I2C0_handle, NULL, NULL);
 }
 
 /***********************************************************************************************************************
